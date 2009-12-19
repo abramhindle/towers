@@ -3,3 +3,6 @@ Towers - a silly geoDefense clone wannabe
 Prerequisites:
   alexandria
   cl-opengl
+
+To play from sbcl run:
+sbcl --lisp run.lisp
