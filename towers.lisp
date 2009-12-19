@@ -643,7 +643,7 @@
       (gl:color 0.2 0.5 1.0)
       (display-text 50.0 -75.0 (type-of tower))
       (display-text 50.0 -80.0 "Level ~D" (level tower))
-      (display-text 50.0 -85.0 "Upgrade (~D)" (buy-price tower))
+      (when (< (level tower) (max-level tower)) (display-text 50.0 -85.0 "Upgrade (~D)" (buy-price tower)))
       (display-text 50.0 -90.0 "Sell (~D)" (sell-price tower)))))
 
 (defmethod select ((control tower-control) op pos)
@@ -1289,6 +1289,38 @@
                              :speed 0.8
                              :path path
                              :hit-points 30
+                             :cash-reward 10)))
+  (wave :start-tick 1500 :wait-ticks 60 :enemies
+        (loop repeat 10 collecting
+              (make-instance 'sqrewy
+                             :pos (vec 0.0 100.0)
+                             :speed 0.9
+                             :path path
+                             :hit-points 30
+                             :cash-reward 10)))
+  (wave :start-tick 2000 :wait-ticks 60 :enemies
+        (loop repeat 10 collecting
+              (make-instance 'sqrewy
+                             :pos (vec 0.0 100.0)
+                             :speed 1.0
+                             :path path
+                             :hit-points 30
+                             :cash-reward 10)))
+  (wave :start-tick 2500 :wait-ticks 60 :enemies
+        (loop repeat 10 collecting
+              (make-instance 'sqrewy
+                             :pos (vec 0.0 100.0)
+                             :speed 1.0
+                             :path path
+                             :hit-points 60
+                             :cash-reward 10)))
+  (wave :start-tick 3000 :wait-ticks 60 :enemies
+        (loop repeat 10 collecting
+              (make-instance 'sqrewy
+                             :pos (vec 0.0 100.0)
+                             :speed 2.0
+                             :path path
+                             :hit-points 60
                              :cash-reward 10)))
   (grid))
 
