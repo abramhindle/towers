@@ -125,7 +125,13 @@
 	(draw-circle radius 30 filledp)
 	(draw-star radius 5 2)
 )
+(defun draw-agram (points radius &optional (filledp nil)) 
+	(draw-circle radius 30 filledp)
+	(draw-star radius points 2)
+)
+
 (defun draw-triangle (radius &optional (filledp nil)) (draw-circle radius 3 filledp))
+(defun draw-square (radius &optional (filledp nil)) (draw-circle radius 4 filledp))
 
 
 (defun draw-heptagon 	 (radius &optional (filledp nil)) (draw-circle radius	7 filledp))
@@ -721,9 +727,21 @@
    (make-instance
     'game-window
     :world-generator 
-    (let ((levels #(level-random level-2 level-1)))
+    (let ((levels #(level-1 level-2 level-random1 level-random2 level-random3 level-random4 
+                    level-random5)))
       (lambda (index)
         (make-level (aref levels (mod index (length levels)))))))))
+
+(defun randomgame ()
+  (glut:display-window
+   (make-instance
+    'game-window
+    :world-generator 
+    (let ((levels #(level-random1 level-random2 level-random3 level-random4 
+                    level-random5)))
+      (lambda (index)
+        (make-level (aref levels (mod index (length levels)))))))))
+
 
 
 ;;;; Player
@@ -1263,7 +1281,78 @@
       (gl:translate x y 0.0))
     (gl:rotate (angle sq) 0.0 0.0 1.0)
     (apply #'gl:color (explosion-color sq))
-    (draw-pentagram 3)))
+    (draw-roundy sq)))
+
+(defmethod draw-roundy ((sq sqroundy))
+  (draw-circle 2))
+
+(defclass sqpulser (sqroundy)
+  ((sides :initform 6 :accessor sides))
+  (:default-initargs :explosion-color (list 0.9 0.0 0.0)))
+
+(defmethod draw-my-sides ((sq sqpulser) nsides &optional (radius 2) (filledp nil))
+  (draw-sides nsides radius filledp))
+
+(defmethod draw-roundy ((sq sqpulser))
+  (progn
+    (incf (sides sq))
+    (if (> (sides sq) 32) (setf (sides sq) 6))
+    (draw-my-sides sq (round (/ (sides sq) 2)) (collision-radius sq))))
+
+(defun draw-sides (n &optional (radius 2) (filledp nil)) 
+  (if (> n 2)
+      (draw-circle radius n filledp)))
+
+;;; a pulser that pulses pentagrams 
+(defclass sqgrampulser (sqpulser)
+  ((sides :initform 6 :accessor sides))
+  (:default-initargs :explosion-color (list 0.97 0.97 0.97)))
+
+(defmethod draw-my-sides ((sq sqgrampulser) nsides &optional (radius 2) (filledp nil))
+  (draw-agram nsides radius filledp))
+
+
+(defclass sngon (sqroundy)
+  ((sides :initform 3 :accessor sides))
+  (:default-initargs :explosion-color (list 0.9 0.1 0.7)))
+
+(defmethod draw-roundy ((sq sngon))
+    (draw-sides (sides sq) (collision-radius sq)))
+
+
+(defclass sqpentagon  (sngon) ((sides :initform 5))
+  (:default-initargs :explosion-color (list 0.6 0.6 0.6)))
+(defclass sqhexagon   (sngon) ((sides :initform 6))
+  (:default-initargs :explosion-color (list 0.6 0.3 0.6)))  
+(defclass sqheptagon  (sngon) ((sides :initform 7))
+  (:default-initargs :explosion-color (list 0.6 0.9 0.99)))
+(defclass sqoctagon   (sngon) ((sides :initform 8))
+  (:default-initargs :explosion-color (list 0.96 0.96 0.6)))
+(defclass sqenneagon (sngon) ((sides :initform 9))
+  (:default-initargs :explosion-color (list 0.1 0.9 0.6)))
+
+(defclass snagram (sqroundy)
+  ((points :initform 6 :accessor points))
+  (:default-initargs :explosion-color (list 0.9 0.1 0.7)))
+
+(defmethod draw-roundy ((sq snagram))
+    (draw-agram (points sq) (collision-radius sq)))
+
+(defclass sqpentagram  (snagram) ((points :initform 5))
+  (:default-initargs :explosion-color (list 0.6 0.6 0.6)))
+
+(defclass sqhexagram   (snagram) ((points :initform 6))
+  (:default-initargs :explosion-color (list 0.6 0.3 0.6)))  
+
+(defclass sqheptagram  (snagram) ((points :initform 7))
+  (:default-initargs :explosion-color (list 0.6 0.9 0.99)))
+
+(defclass sqoctagram   (snagram) ((points :initform 8))
+  (:default-initargs :explosion-color (list 0.96 0.96 0.6)))
+
+(defclass sqenneagram (snagram) ((points :initform 9))
+  (:default-initargs :explosion-color (list 0.1 0.9 0.6)))
+
 
 
 ;;;; Waves
@@ -1378,22 +1467,7 @@
 
 (define-level level-1
   (homebase :lives 2 :pos (vec -50.0 -50.0))
-  (path :named path :spline 
-
-                    '(9.423454 73.83604 9.423454 73.83604 26.09599 54.362114
-                      26.09599 54.362114 17.1558 37.198845 17.1558 37.198845
-                      1.0727386 21.881884 1.0727386 21.881884 -15.0 25 -15.0 25
-                      -15.0 25 -15.0 25))
-
-
-                                        ;'(100.0 100.0 100.0 100.0 
-                              ;25.0 50.0 25.0 50.0
-                              ;-25.0 50.0 -25.0 50.0
-                              ;-25.0 -25.0 -25.0 -25.0
-                              ;-66.0 -25.0 -66.0 -25.0
-                             ; -50.0 -50.0 -50. -50.0
-                             ; -50.0 -50.0 -50. -50.0))
-     ;      '(0.0 100.0 10.0 10.0 -10.0 -10.0 -50.0 -50.0))
+  (path :named path :spline '(0.0 100.0 10.0 10.0 -10.0 -10.0 -50.0 -50.0))
   (player :cash 10)
   (tower-control)
   (tower-factory :kind 'blaster-tower :pos (vec -60.0 -85.0)
@@ -1402,7 +1476,7 @@
   (wave :start-tick 100 :wait-ticks 50 :enemies
         (loop repeat 5 collecting
               (make-instance 'sqarry
-                             :pos (vec 9.423454 73.83604);0.0 100.0)
+                             :pos (vec 0.0 100.0)
                              :speed 0.4
                              :path path
                              :hit-points 5
@@ -1526,24 +1600,38 @@
   (let* ((l (list 
              (x endpos) (y endpos) (x endpos) (y endpos)
              (x endpos) (y endpos) (x endpos) (y endpos)))
-         (xstep (/ (x *half-world-dimensions*) 4.0))
-         (ystep (/ (y *half-world-dimensions*) 4.0)))
+         (xstep (/ (x *half-world-dimensions*) 2.0))
+         (ystep (/ (y *half-world-dimensions*) 2.0)))
     (generate-spline-iterate pts 1 l xstep ystep)))
 
 ;               (let ((enemies #('sqarry)))
 ;                 (aref enemies (random (length enemies)))))    
 
+(defun choose-arr (l) (aref l (random (length l))))
 
-
+; This functions generates waves of enemies 
 (defun generate-waves (nwaves x y path) 
-  (let ((start-time 100)
-        (inverse-speed 0.2)
-        (enemies (list 'sqarry 'sqroundy 'sqrewy)))
-    (labels ((random-enemy-type () (nth enemies (random (length (enemies)))))
+  (let* ((start-time 100)
+         (inverse-speed 0.2))
+    (labels (;(random-enemy-type () (nth enemies (random (length enemies))))
              (gen-wave (start-time inverse-speed nenemies hp cash)
                             `(wave :start-tick ,start-time :wait-ticks ,(+ 30 (random 100)) :enemies
                                   (loop repeat ,nenemies collecting
-                                       (make-instance 'sqarry;,(random-enemy-type)
+                                       (make-instance ', (choose-arr #(sqarry 
+                                                                       sqroundy 
+                                                                       sqrewy 
+                                                                       sqpulser
+                                                                       sqpentagon 
+                                                                       sqhexagon  
+                                                                       sqheptagon 
+                                                                       sqoctagon  
+                                                                       sqenneagon
+                                                                       sqgrampulser
+                                                                       sqpentagram
+                                                                       sqhexagram 
+                                                                       sqheptagram
+                                                                       sqoctagram 
+                                                                       sqenneagram))
                                                       :pos (vec ,x ,y)
                                                       :speed ,inverse-speed
                                                       :path path
@@ -1557,7 +1645,7 @@
                     (gen-wave start-time inverse-speed nememies hp cash)
                     (make-waves (- nwaves 1) 
                                 (+ start-time 200 (random 500))
-                                (* (+ 1.0 (/ (random 10) 10.0)) inverse-speed)
+                                (* (+ 1.0 (* 0.6 (/ (random 100) 100.0))) inverse-speed)
                                 (+ 5 (random 20))
                                 (+ hp (random 10))
                                 (+ cash (random (+ 1 cash))))))))
@@ -1583,7 +1671,11 @@
       (print final)
       (eval final))))
 
-(generate-level 'level-random)
+(generate-level 'level-random1)
+(generate-level 'level-random2)
+(generate-level 'level-random3)
+(generate-level 'level-random4)
+(generate-level 'level-random5)
          
 
 Spline editor
