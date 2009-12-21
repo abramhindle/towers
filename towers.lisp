@@ -55,6 +55,9 @@
           (setf pathname (merge-pathnames pathname home)))
         pathname)))
 
+
+(setf *random-state* (make-random-state t))
+
 
 ;;;; Utilities
 
@@ -718,7 +721,7 @@
    (make-instance
     'game-window
     :world-generator 
-    (let ((levels #(level-random level-1 level-2)))
+    (let ((levels #(level-random level-2 level-1)))
       (lambda (index)
         (make-level (aref levels (mod index (length levels)))))))))
 
@@ -1375,7 +1378,22 @@
 
 (define-level level-1
   (homebase :lives 2 :pos (vec -50.0 -50.0))
-  (path :named path :spline '(0.0 100.0 10.0 10.0 -10.0 -10.0 -50.0 -50.0))
+  (path :named path :spline 
+
+                    '(9.423454 73.83604 9.423454 73.83604 26.09599 54.362114
+                      26.09599 54.362114 17.1558 37.198845 17.1558 37.198845
+                      1.0727386 21.881884 1.0727386 21.881884 -15.0 25 -15.0 25
+                      -15.0 25 -15.0 25))
+
+
+                                        ;'(100.0 100.0 100.0 100.0 
+                              ;25.0 50.0 25.0 50.0
+                              ;-25.0 50.0 -25.0 50.0
+                              ;-25.0 -25.0 -25.0 -25.0
+                              ;-66.0 -25.0 -66.0 -25.0
+                             ; -50.0 -50.0 -50. -50.0
+                             ; -50.0 -50.0 -50. -50.0))
+     ;      '(0.0 100.0 10.0 10.0 -10.0 -10.0 -50.0 -50.0))
   (player :cash 10)
   (tower-control)
   (tower-factory :kind 'blaster-tower :pos (vec -60.0 -85.0)
@@ -1383,8 +1401,8 @@
                  :sell-prices #(0 2 5 7 10 15 25 35))
   (wave :start-tick 100 :wait-ticks 50 :enemies
         (loop repeat 5 collecting
-              (make-instance 'sqroundy
-                             :pos (vec 0.0 100.0)
+              (make-instance 'sqarry
+                             :pos (vec 9.423454 73.83604);0.0 100.0)
                              :speed 0.4
                              :path path
                              :hit-points 5
@@ -1490,11 +1508,11 @@
 (defun gsp-good-step (x y xstep ystep)
   (let ((nx (+ x (- (* 2 (random xstep)) xstep)))
         (ny (+ y (- (* 2 (random ystep)) ystep))))
-    (if (or 
+    (if (or
          (> (abs nx) (x *half-world-dimensions*)) 
          (> (abs ny) (y *half-world-dimensions*)))
         (gsp-good-step x y xstep ystep)
-        (list nx ny))))
+        (list nx ny nx ny))))
 
 ; I couldn't figure out the loop macro enough to do this
 ; This executes random walk backwards (brownian motion) using tail recursion
@@ -1505,7 +1523,9 @@
 
 ;;; random walk
 (defun generate-spline (endpos pts)
-  (let* ((l (list (x endpos) (y endpos)))
+  (let* ((l (list 
+             (x endpos) (y endpos) (x endpos) (y endpos)
+             (x endpos) (y endpos) (x endpos) (y endpos)))
          (xstep (/ (x *half-world-dimensions*) 4.0))
          (ystep (/ (y *half-world-dimensions*) 4.0)))
     (generate-spline-iterate pts 1 l xstep ystep)))
@@ -1517,12 +1537,11 @@
 
 (defun generate-waves (nwaves x y path) 
   (let ((start-time 100)
-        (inverse-speed 50)
-        (enemies (list 'sqarry))
-        )
+        (inverse-speed 0.2)
+        (enemies (list 'sqarry 'sqroundy 'sqrewy)))
     (labels ((random-enemy-type () (nth enemies (random (length (enemies)))))
              (gen-wave (start-time inverse-speed nenemies hp cash)
-                            `(wave :start-tick ,start-time :wait-ticks ,inverse-speed :enemies
+                            `(wave :start-tick ,start-time :wait-ticks ,(+ 30 (random 100)) :enemies
                                   (loop repeat ,nenemies collecting
                                        (make-instance 'sqarry;,(random-enemy-type)
                                                       :pos (vec ,x ,y)
@@ -1538,7 +1557,7 @@
                     (gen-wave start-time inverse-speed nememies hp cash)
                     (make-waves (- nwaves 1) 
                                 (+ start-time 200 (random 500))
-                                (+ 25 (random 50))
+                                (* (+ 1.0 (/ (random 10) 10.0)) inverse-speed)
                                 (+ 5 (random 20))
                                 (+ hp (random 10))
                                 (+ cash (random (+ 1 cash))))))))
@@ -1549,15 +1568,15 @@
   (let* ((hpos (vec (* -1.0 (random 60)) (random 50)))
          (spline (generate-spline hpos (+ 2 (random 30))))
          (tpos (vec -60.0 -85.0))
-	 ; this is lame, because it is a macro I have to do all of this work
-         (level-head `(define-level ,level-name
-                        (homebase :lives 5 :pos (vec ,(x hpos) ,(y hpos)))
-                        (path :named path :spline ',spline)
-                        (player :cash 20)
-                        (tower-control)
-                        (tower-factory :kind 'blaster-tower :pos (vec ,(x tpos) ,(y tpos))
-                                       :buy-prices #(5 5 7 10 15 20 30)
-                                       :sell-prices #(0 2 5 7 10 15 25 35))))
+         ;; this is lame, because it is a macro I have to do all of this work
+           (level-head `(define-level ,level-name
+                            (homebase :lives 5 :pos (vec ,(x hpos) ,(y hpos)))
+                          (path :named path :spline ',spline)
+                          (player :cash 20)
+                          (tower-control)
+                          (tower-factory :kind 'blaster-tower :pos (vec ,(x tpos) ,(y tpos))
+                                         :buy-prices #(5 5 7 10 15 20 30)
+                                         :sell-prices #(0 2 5 7 10 15 25 35))))
          (waves (generate-waves (+ 5 (random 10)) (car spline) (cadr spline) spline))
          (final (append level-head waves `((grid)))))
     (progn
