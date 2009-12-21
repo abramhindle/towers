@@ -1,9 +1,18 @@
 ;;;; +----------------------------------------------------------------+
 ;;;; | TOWERS - A silly geoDefense clone wannabe          DEATH, 2009 |
 ;;;; +----------------------------------------------------------------+
-
+;;;;
+;;;; Subject: Re: Lack of License [death/towers GH-1]
+;;;; 
+;;;; I hereby dedicate Towers to public domain.
+;;;; 
+;;;; In other words, you can do whatever you want with it.  I disclaim any liability.  I provide no warranty of any kind.  It's as if it just popped into existence.
+;;;; 
+;;;; If these statements don't make my intent clear, then the world is truly a seriously messed up place, and I have no more to say about that issue.
+;;;; Parts of this code are under an MIT style license:
 ;;;; draw circle was derived from 
 ;;;;    http://github.com/sykopomp/until-it-dies/blob/master/src/primitives.lisp
+;;;; Tower Defense © 2009 Death, Abram Hindle(minor bug fix)
 ;;;; Until It Dies is Copyright © 2009 Josh Marchán, Adlai Chadrasekhar
 ;;;;  
 ;;;; Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -68,17 +77,18 @@
 (defun cosd (deg)
   (cos (rad deg)))
 
-(defun draw-circle (radius &optional (resolution 30) (filledp nil))
-  ;; http://github.com/sykopomp/until-it-dies/blob/master/src/primitives.lisp
-  ;; Stole implementation and modified it a bit
-  (let* ((theta (* 2.0 (/ single-pi resolution)))
-         (tangential-factor (tan theta))
-         (radial-factor (- 1.0 (cos theta))))
-    (gl:with-primitives (if filledp :triangle-fan :line-loop)
-      (loop with x = radius
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  ;; Yes, eval-when here is a hack.. drop when splitting file
+  (defun call-with-circle-multipliers (fn &optional (segments 30))
+    ;; http://github.com/sykopomp/until-it-dies/blob/master/src/primitives.lisp
+    ;; Stole implementation of draw-circle and modified it a bit
+    (let* ((theta (* 2.0 (/ single-pi segments)))
+           (tangential-factor (tan theta))
+           (radial-factor (- 1.0 (cos theta))))
+      (loop with x = 1.0
             with y = 0.0
-            repeat resolution
-            do (gl:vertex x y)
+            repeat segments
+            do (funcall fn x y)
             (let ((tx (- y))
                   (ty x))
               (incf x (* tx tangential-factor))
@@ -88,18 +98,103 @@
               (incf x (* rx radial-factor))
               (incf y (* ry radial-factor)))))))
 
-(defun call-with-curve-multipliers (fn &optional (segments 20))
-  (funcall fn 1.0 0.0 0.0 0.0)
-  (loop with step = (/ 1.0 segments)
-        repeat (- segments 2)
-        for u = step then (+ u step)
-        for v = (- 1.0 u)
-        for am = (* 1.0 v v v)
-        for bm = (* 3.0 v v u)
-        for cm = (* 3.0 v u u)
-        for dm = (* 1.0 u u u)
-        do (funcall fn am bm cm dm))
-  (funcall fn 0.0 0.0 0.0 1.0))
+(define-compiler-macro draw-circle (&whole form radius &optional (segments 30) (filledp nil))
+  (if (integerp segments)
+      (once-only (radius)
+        (let ((instructions '()))
+          (call-with-circle-multipliers
+           (lambda (x y)
+             (push `(gl:vertex (* ,radius ,x) (* ,radius ,y)) instructions))
+           segments)
+          `(gl:with-primitives (if ,filledp :triangle-fan :line-loop)
+             ,@(nreverse instructions))))
+      form))
+      
+(defun draw-circle (radius &optional (segments 30) (filledp nil))
+  (gl:with-primitives (if filledp :triangle-fan :line-loop)
+    (call-with-circle-multipliers
+     (lambda (x y) (gl:vertex (* x radius) (* y radius)))
+     segments)))
+
+(defun draw-pentagon (radius &optional (filledp nil)) (draw-circle radius 5 filledp))
+(defun draw-hexagon (radius &optional (filledp nil)) (draw-circle radius 6 filledp))
+(defun draw-pentagram (radius &optional (filledp nil)) 
+	(draw-circle radius 30 filledp)
+	(draw-star radius 5 2)
+)
+(defun draw-triangle (radius &optional (filledp nil)) (draw-circle radius 3 filledp))
+
+
+(defun draw-heptagon 	 (radius &optional (filledp nil)) (draw-circle radius	7 filledp))
+(defun draw-octagon 	 (radius &optional (filledp nil)) (draw-circle radius	8 	 filledp))
+(defun draw-enneagon  	 (radius &optional (filledp nil)) (draw-circle radius	9 	 filledp))
+(defun draw-decagon 	 (radius &optional (filledp nil)) (draw-circle radius	10 	 filledp))
+(defun draw-hendecagon 	 (radius &optional (filledp nil)) (draw-circle radius	11 filledp))
+(defun draw-dodecagon 	 (radius &optional (filledp nil)) (draw-circle radius	12 filledp))
+(defun draw-tridecagon   (radius &optional (filledp nil)) (draw-circle radius	13  filledp))
+(defun draw-tetradecagon (radius &optional (filledp nil)) (draw-circle radius  	14  filledp))
+(defun draw-pentadecagon (radius &optional (filledp nil)) (draw-circle radius  	15  filledp))
+(defun draw-hexadecagon  (radius &optional (filledp nil)) (draw-circle radius 	16  filledp))
+(defun draw-heptadecagon (radius &optional (filledp nil)) (draw-circle radius  	17  filledp))
+(defun draw-octadecagon  (radius &optional (filledp nil)) (draw-circle radius	18  filledp))
+(defun draw-enneadecagon (radius &optional (filledp nil)) (draw-circle radius  	19  filledp))
+(defun draw-icosagon	 (radius &optional (filledp nil)) (draw-circle radius	20 filledp))
+
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun mod+ (n m p)
+    (mod (+ n m) p))
+  
+  (defun call-with-star-multipliers (fn points density)
+    (let ((xs (make-array points :element-type 'single-float))
+          (ys (make-array points :element-type 'single-float)))
+      (let ((i 0))
+        (call-with-circle-multipliers
+         (lambda (x y)
+           (setf (aref xs i) x)
+           (setf (aref ys i) y)
+           (incf i))
+         points))
+      (dotimes (i points)
+        (let ((j (mod+ i density points)))
+          (funcall fn
+                   (aref xs i) (aref ys i)
+                   (aref xs j) (aref ys j)))))))
+
+(define-compiler-macro draw-star (&whole form radius points density)
+  (if (and (integerp points) (integerp density))
+      (once-only (radius)
+        (let ((instructions '()))
+          (call-with-star-multipliers
+           (lambda (x1 y1 x2 y2)
+             (push `(gl:vertex (* ,x1 ,radius) (* ,y1 ,radius)) instructions)
+             (push `(gl:vertex (* ,x2 ,radius) (* ,y2 ,radius)) instructions))
+           points density)
+          `(gl:with-primitive :lines
+             ,@(nreverse instructions))))
+      form))
+
+(defun draw-star (radius points density)
+  (gl:with-primitive :lines
+    (call-with-star-multipliers
+     (lambda (x1 y1 x2 y2)
+       (gl:vertex (* x1 radius) (* y1 radius))
+       (gl:vertex (* x2 radius) (* y2 radius)))
+     points density)))
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun call-with-curve-multipliers (fn &optional (segments 20))
+    (funcall fn 1.0 0.0 0.0 0.0)
+    (loop with step = (/ 1.0 segments)
+          repeat (- segments 2)
+          for u = step then (+ u step)
+          for v = (- 1.0 u)
+          for am = (* 1.0 v v v)
+          for bm = (* 3.0 v v u)
+          for cm = (* 3.0 v u u)
+          for dm = (* 1.0 u u u)
+          do (funcall fn am bm cm dm))
+    (funcall fn 0.0 0.0 0.0 1.0)))
 
 (define-compiler-macro draw-cubic-curve (&whole form ax ay bx by cx cy dx dy &optional (segments 20))
   (if (integerp segments)
@@ -112,15 +207,17 @@
                           (+ (* ,am ,ay) (* ,bm ,by) (* ,cm ,cy) (* ,dm ,dy)))
               instructions))
            segments)
-          `(progn (nreverse ,@instructions))))
+          `(gl:with-primitive :line-strip
+             ,@(nreverse instructions))))
       form))
 
 (defun draw-cubic-curve (ax ay bx by cx cy dx dy &optional (segments 20))
-  (call-with-curve-multipliers
-   (lambda (am bm cm dm)
-     (gl:vertex (+ (* am ax) (* bm bx) (* cm cx) (* dm dx))
-                (+ (* am ay) (* bm by) (* cm cy) (* dm dy))))
-   segments))
+  (gl:with-primitive :line-strip
+    (call-with-curve-multipliers
+     (lambda (am bm cm dm)
+       (gl:vertex (+ (* am ax) (* bm bx) (* cm cx) (* dm dx))
+                  (+ (* am ay) (* bm by) (* cm cy) (* dm dy))))
+     segments)))
 
 (defun square (x)
   (* x x))
@@ -621,7 +718,7 @@
    (make-instance
     'game-window
     :world-generator 
-    (let ((levels #(level-1 level-2)))
+    (let ((levels #(level-random level-1 level-2)))
       (lambda (index)
         (make-level (aref levels (mod index (length levels)))))))))
 
@@ -666,7 +763,8 @@
       (gl:color 0.2 0.5 1.0)
       (display-text 50.0 -75.0 (type-of tower))
       (display-text 50.0 -80.0 "Level ~D" (level tower))
-      (when (< (level tower) (max-level tower)) (display-text 50.0 -85.0 "Upgrade (~D)" (buy-price tower)))
+      (when (< (level tower) (max-level tower))
+        (display-text 50.0 -85.0 "Upgrade (~D)" (buy-price tower)))
       (display-text 50.0 -90.0 "Sell (~D)" (sell-price tower)))))
 
 (defmethod select ((control tower-control) op pos)
@@ -1133,6 +1231,37 @@
       (gl:vertex +2.0 +2.0)
       (gl:vertex -2.0 +2.0))))
 
+(defclass sqarry (enemy)
+  ((angle :initform 0.0 :accessor angle))
+  (:default-initargs :collision-radius 2 :explosion-color (list 0.8 0.3 0.4)))
+
+(defmethod update :after ((sq sqarry))
+  (setf (angle sq) (mod+ (angle sq) -2.0 360.0)))
+
+(defmethod render ((sq sqarry))
+  (gl:with-pushed-matrix
+    (with-vec (x y (pos sq))
+      (gl:translate x y 0.0))
+    (gl:rotate (angle sq) 0.0 0.0 1.0)
+    (apply #'gl:color (explosion-color sq))
+    (draw-star 2.0 5 2)))
+
+
+(defclass sqroundy (enemy)
+  ((angle :initform 0.0 :accessor angle))
+  (:default-initargs :collision-radius 2 :explosion-color (list 0.9 0.9 0.9)))
+
+(defmethod update :after ((sq sqroundy))
+  (setf (angle sq) (mod+ (angle sq) -2.0 360.0)))
+
+(defmethod render ((sq sqroundy))
+  (gl:with-pushed-matrix
+    (with-vec (x y (pos sq))
+      (gl:translate x y 0.0))
+    (gl:rotate (angle sq) 0.0 0.0 1.0)
+    (apply #'gl:color (explosion-color sq))
+    (draw-pentagram 3)))
+
 
 ;;;; Waves
 
@@ -1254,7 +1383,7 @@
                  :sell-prices #(0 2 5 7 10 15 25 35))
   (wave :start-tick 100 :wait-ticks 50 :enemies
         (loop repeat 5 collecting
-              (make-instance 'sqrewy
+              (make-instance 'sqroundy
                              :pos (vec 0.0 100.0)
                              :speed 0.4
                              :path path
@@ -1297,7 +1426,7 @@
                              :path path
                              :hit-points 10
                              :cash-reward 2)))
-  (wave :start-tick 500 :wait-ticks 40 :enemies
+  (wave :start-tick 400 :wait-ticks 40 :enemies
         (loop repeat 5 collecting
               (make-instance 'sqrewy
                              :pos (vec 0.0 100.0)
@@ -1305,11 +1434,19 @@
                              :path path
                              :hit-points 15
                              :cash-reward 5)))
-  (wave :start-tick 1000 :wait-ticks 60 :enemies
+  (wave :start-tick 800 :wait-ticks 50 :enemies
         (loop repeat 10 collecting
-              (make-instance 'sqrewy
+              (make-instance 'sqarry
                              :pos (vec 0.0 100.0)
                              :speed 0.8
+                             :path path
+                             :hit-points 30
+                             :cash-reward 10)))
+  (wave :start-tick 1200 :wait-ticks 40 :enemies
+        (loop repeat 10 collecting
+              (make-instance 'sqroundy
+                             :pos (vec 0.0 100.0)
+                             :speed 0.9
                              :path path
                              :hit-points 30
                              :cash-reward 10)))
@@ -1347,8 +1484,90 @@
                              :cash-reward 10)))
   (grid))
 
+;; Sorry about this crap
+; this fuctions tries to generate a tuple of the next position to place 
+; the spline, it checks bounds.
+(defun gsp-good-step (x y xstep ystep)
+  (let ((nx (+ x (- (* 2 (random xstep)) xstep)))
+        (ny (+ y (- (* 2 (random ystep)) ystep))))
+    (if (or 
+         (> (abs nx) (x *half-world-dimensions*)) 
+         (> (abs ny) (y *half-world-dimensions*)))
+        (gsp-good-step x y xstep ystep)
+        (list nx ny))))
+
+; I couldn't figure out the loop macro enough to do this
+; This executes random walk backwards (brownian motion) using tail recursion
+(defun generate-spline-iterate (pts n l xstep ystep)
+  (if (= n pts)
+      l
+      (generate-spline-iterate pts (+ n 1) (append (gsp-good-step (car l) (cadr l) xstep ystep) l) xstep ystep)))
+
+;;; random walk
+(defun generate-spline (endpos pts)
+  (let* ((l (list (x endpos) (y endpos)))
+         (xstep (/ (x *half-world-dimensions*) 4.0))
+         (ystep (/ (y *half-world-dimensions*) 4.0)))
+    (generate-spline-iterate pts 1 l xstep ystep)))
+
+;               (let ((enemies #('sqarry)))
+;                 (aref enemies (random (length enemies)))))    
+
+
+
+(defun generate-waves (nwaves x y path) 
+  (let ((start-time 100)
+        (inverse-speed 50)
+        (enemies (list 'sqarry))
+        )
+    (labels ((random-enemy-type () (nth enemies (random (length (enemies)))))
+             (gen-wave (start-time inverse-speed nenemies hp cash)
+                            `(wave :start-tick ,start-time :wait-ticks ,inverse-speed :enemies
+                                  (loop repeat ,nenemies collecting
+                                       (make-instance 'sqarry;,(random-enemy-type)
+                                                      :pos (vec ,x ,y)
+                                                      :speed ,inverse-speed
+                                                      :path path
+                                                      :hit-points ,hp
+                                                      :cash-reward ,cash))))
+         ; this is done recursively because hp and cash rely on the last values
+             (make-waves (nwaves start-time inverse-speed nememies hp cash)
+               (if (= nwaves 0)
+                   (list)
+                   (cons 
+                    (gen-wave start-time inverse-speed nememies hp cash)
+                    (make-waves (- nwaves 1) 
+                                (+ start-time 200 (random 500))
+                                (+ 25 (random 50))
+                                (+ 5 (random 20))
+                                (+ hp (random 10))
+                                (+ cash (random (+ 1 cash))))))))
+      (make-waves nwaves start-time inverse-speed 
+                  (+ 5 (random 10)) 10 (+ 1 (random 2))))))
+
+(defun generate-level (level-name)
+  (let* ((hpos (vec (* -1.0 (random 60)) (random 50)))
+         (spline (generate-spline hpos (+ 2 (random 30))))
+         (tpos (vec -60.0 -85.0))
+	 ; this is lame, because it is a macro I have to do all of this work
+         (level-head `(define-level ,level-name
+                        (homebase :lives 5 :pos (vec ,(x hpos) ,(y hpos)))
+                        (path :named path :spline ',spline)
+                        (player :cash 20)
+                        (tower-control)
+                        (tower-factory :kind 'blaster-tower :pos (vec ,(x tpos) ,(y tpos))
+                                       :buy-prices #(5 5 7 10 15 20 30)
+                                       :sell-prices #(0 2 5 7 10 15 25 35))))
+         (waves (generate-waves (+ 5 (random 10)) (car spline) (cadr spline) spline))
+         (final (append level-head waves `((grid)))))
+    (progn
+      (print final)
+      (eval final))))
+
+(generate-level 'level-random)
+         
 
-;;;; Spline editor
+Spline editor
 
 (defclass spliner ()
   ((points :initform '() :accessor points)))
