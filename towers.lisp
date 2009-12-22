@@ -12,6 +12,7 @@
 ;;;; Parts of this code are under an MIT style license:
 ;;;; draw circle was derived from 
 ;;;;    http://github.com/sykopomp/until-it-dies/blob/master/src/primitives.lisp
+;;;;
 ;;;; Tower Defense © 2009 Death, Abram Hindle(minor bug fix)
 ;;;; Until It Dies is Copyright © 2009 Josh Marchán, Adlai Chadrasekhar
 ;;;;  
@@ -36,7 +37,7 @@
 
 (defpackage #:towers
   (:use #:cl #:alexandria)
-  (:export #:game))
+  (:export #:game #:randomgame))
 
 (in-package #:towers)
 

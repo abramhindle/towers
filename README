@@ -6,3 +6,4 @@ Prerequisites:
 
 To play from sbcl run:
 sbcl --lisp run.lisp
+sbcl --lisp runrandom.lisp #for random levels
