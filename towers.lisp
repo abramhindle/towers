@@ -83,6 +83,15 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; Yes, eval-when here is a hack.. drop when splitting file
+
+  (defun collect-results (fn &rest args)
+    (let ((collection '()))
+      (apply fn
+             (lambda (&rest results)
+               (push results collection))
+             args)
+      (nreverse collection)))
+
   (defun call-with-circle-multipliers (fn &optional (segments 30))
     ;; http://github.com/sykopomp/until-it-dies/blob/master/src/primitives.lisp
     ;; Stole implementation of draw-circle and modified it a bit
@@ -105,13 +114,9 @@
 (define-compiler-macro draw-circle (&whole form radius &optional (segments 30) (filledp nil))
   (if (integerp segments)
       (once-only (radius)
-        (let ((instructions '()))
-          (call-with-circle-multipliers
-           (lambda (x y)
-             (push `(gl:vertex (* ,radius ,x) (* ,radius ,y)) instructions))
-           segments)
-          `(gl:with-primitives (if ,filledp :triangle-fan :line-loop)
-             ,@(nreverse instructions))))
+        `(gl:with-primitives (if ,filledp :triangle-fan :line-loop)
+           (loop for (x y) in ',(collect-results #'call-with-circle-multipliers segments)
+                 do (gl:vertex (* ,radius x) (* ,radius y)))))
       form))
       
 (defun draw-circle (radius &optional (segments 30) (filledp nil))
@@ -174,14 +179,10 @@
 (define-compiler-macro draw-star (&whole form radius points density)
   (if (and (integerp points) (integerp density))
       (once-only (radius)
-        (let ((instructions '()))
-          (call-with-star-multipliers
-           (lambda (x1 y1 x2 y2)
-             (push `(gl:vertex (* ,x1 ,radius) (* ,y1 ,radius)) instructions)
-             (push `(gl:vertex (* ,x2 ,radius) (* ,y2 ,radius)) instructions))
-           points density)
-          `(gl:with-primitive :lines
-             ,@(nreverse instructions))))
+        `(gl:with-primitive :lines
+           (loop for (x1 y1 x2 y2) in ',(collect-results #'call-with-star-multipliers points density) do
+                 (gl:vertex (* ,radius x1) (* ,radius y1))
+                 (gl:vertex (* ,radius x2) (* ,radius y2)))))
       form))
 
 (defun draw-star (radius points density)
@@ -209,16 +210,10 @@
 (define-compiler-macro draw-cubic-curve (&whole form ax ay bx by cx cy dx dy &optional (segments 20))
   (if (integerp segments)
       (once-only (ax ay bx by cx cy dx dy)
-        (let ((instructions '()))
-          (call-with-curve-multipliers
-           (lambda (am bm cm dm)
-             (push
-              `(gl:vertex (+ (* ,am ,ax) (* ,bm ,bx) (* ,cm ,cx) (* ,dm ,dx))
-                          (+ (* ,am ,ay) (* ,bm ,by) (* ,cm ,cy) (* ,dm ,dy)))
-              instructions))
-           segments)
-          `(gl:with-primitive :line-strip
-             ,@(nreverse instructions))))
+        `(gl:with-primitive :line-strip
+           (loop for (am bm cm dm) in ',(collect-results #'call-with-curve-multipliers segments)
+                 do (gl:vertex (+ (* am ,ax) (* bm ,bx) (* cm ,cx) (* dm ,dx))
+                               (+ (* am ,ay) (* bm ,by) (* cm ,cy) (* dm ,dy))))))
       form))
 
 (defun draw-cubic-curve (ax ay bx by cx cy dx dy &optional (segments 20))
@@ -540,7 +535,6 @@
          (loop for i from (1- (length (objects world))) downto 0 do
                (mapc #'maybe-call-function (aref (objects world) i))))))))
 
-
 (defmacro do-objects ((object-var &key (world '*world*) (order :hit-test) (type t) collecting) &body forms)
   (if collecting
       (with-gensyms (collection)
@@ -842,13 +836,9 @@
   (coerce
    (loop for (ax ay bx by cx cy dx dy) on spline by #'cddddddr
          when (and ax ay bx by cx cy dx dy)
-         nconc (let ((vs '()))
-                 (call-with-curve-multipliers
-                  (lambda (am bm cm dm)
-                   (push (vec (+ (* am ax) (* bm bx) (* cm cx) (* dm dx))
-                              (+ (* am ay) (* bm by) (* cm cy) (* dm dy)))
-                         vs)))
-                 (nreverse vs)))
+         nconc (loop for (am bm cm dm) in (collect-results #'call-with-curve-multipliers)
+                     collect (vec (+ (* am ax) (* bm bx) (* cm cx) (* dm dx))
+                                  (+ (* am ay) (* bm by) (* cm cy) (* dm dy)))))
    'vector))
 
 (defparameter *path-collision-radius* 3)
@@ -1173,6 +1163,7 @@
    (path :initarg :path :accessor path)
    (next-pos-idx :initform 1 :accessor next-pos-idx)
    (hit-points :initarg :hit-points :accessor hit-points)
+   (max-hit-points :initarg :hit-points :accessor max-hit-points)
    (cash-reward :initarg :cash-reward :accessor cash-reward)
    (vel :initform (vec 0.0 0.0) :accessor vel)
    (explosion-color :initarg :explosion-color :accessor explosion-color)))
@@ -1199,6 +1190,20 @@
       (setf next-pos (aref vertices (next-pos-idx e))))
     (setf (vel e) (vel-vec (spd e) (vec- next-pos pos)))
     (vec+= pos (vel e))))
+
+(defmethod render :after ((e enemy))
+  (gl:with-pushed-matrix
+    (with-vec (x y (pos e))
+      (gl:translate (- x 2.0) y 0.0))
+    (let ((vs '((0.0 2.0) (4.0 2.0) (4.0 3.0) (0.0 3.0))))
+      (gl:with-pushed-matrix
+        (gl:scale (float (/ (hit-points e) (max-hit-points e))) 1.0 1.0)
+        (gl:color 0.0 1.0 0.0 0.7)
+        (gl:with-primitive :quads
+          (loop for (x y) in vs do (gl:vertex x y))))
+      (gl:color 1.0 1.0 1.0 0.5)
+      (gl:with-primitive :line-loop
+        (loop for (x y) in vs do (gl:vertex x y))))))
 
 (defun enemy-die (enemy)
   (remove-object enemy)
@@ -1232,13 +1237,13 @@
 
 (defmethod update :after ((sq sqrewy))
   (ecase (dir sq)
-    (>
-     (if (> (angle sq) 30)
-         (setf (dir sq) '<)
-         (incf (angle sq) 2)))
     (<
-     (if (< (angle sq) -30)
+     (if (> (angle sq) 30)
          (setf (dir sq) '>)
+         (incf (angle sq) 2)))
+    (>
+     (if (< (angle sq) -30)
+         (setf (dir sq) '<)
          (decf (angle sq) 2)))))
 
 (defmethod render ((sq sqrewy))
